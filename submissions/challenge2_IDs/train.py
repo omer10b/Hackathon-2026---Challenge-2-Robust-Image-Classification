@@ -103,62 +103,53 @@ def rand_bbox(size, lam):
 def create_transforms():
     """
     Create the training and validation image transforms.
-    Parameters: None
-    Returns:tuple: train_transform, val_transform
     """
 
-    # 1. Define Training and Validation transforms
+    # Define Training and Validation transforms
     train_transform = transforms.Compose([
-        # --- 1. SPATIAL & GEOMETRIC ---
+        # SPATIAL & GEOMETRIC
         transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)),
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomApply([transforms.RandomRotation(degrees=15)], p=0.3),
+        
+        # 20% chance to warp the perspective (simulates looking at objects from severe angles)
+        transforms.RandomPerspective(distortion_scale=0.4, p=0.2),
 
-        # --- 2. COLOR & LIGHTING ---
-        # NEW: 20% chance to completely invert all colors (forces shape recognition)
+        # COLOR & LIGHTING
         transforms.RandomInvert(p=0.2),
+        
+        # 20% chance to drop all color and force the network to learn from shadows/edges
+        transforms.RandomGrayscale(p=0.2),
+        
+        # 20% chance to solarize (inverts all pixels above a specific brightness threshold)
+        transforms.RandomSolarize(threshold=192.0, p=0.2),
 
         transforms.RandomApply([
-            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.6, hue=0.2)], p=0.4),
+            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.6, hue=0.2)
+        ], p=0.4),
 
-        # --- 3. BLUR (Camera Focus Vulnerability) ---
+        # BLUR 
         transforms.RandomApply([
-            transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))], p=0.3),
+            transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))
+        ], p=0.3),
 
-        # --- CONVERT TO MATH TENSOR ---
+
         transforms.ToTensor(),
 
-        # --- 4. OCCLUSION (Random Erasing Vulnerability) ---
+        # OCCLUSION 
         transforms.RandomErasing(p=0.3, scale=(0.02, 0.25), ratio=(0.5, 2.0), value=0),
 
-        # --- 5. NORMALIZE ---
-        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)])
+        # NORMALIZE 
+        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+    ])
 
+    # VALIDATION REMAINS STRICTLY CLEAN
     val_transform = transforms.Compose([
-        # --- 1. SPATIAL & GEOMETRIC ---
-        transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)),
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomApply([transforms.RandomRotation(degrees=15)], p=0.3),
-
-        # --- 2. COLOR & LIGHTING ---
-        # Same color inversion as training
-        transforms.RandomInvert(p=0.2),
-
-        transforms.RandomApply([
-            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.6, hue=0.2)], p=0.4),
-
-        # --- 3. BLUR (Camera Focus Vulnerability) ---
-        transforms.RandomApply([
-            transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))], p=0.3),
-
-        # --- CONVERT TO MATH TENSOR ---
+        transforms.Resize(256),
+        transforms.CenterCrop(IMAGE_SIZE),
         transforms.ToTensor(),
-
-        # --- 4. OCCLUSION (Random Erasing Vulnerability) ---
-        transforms.RandomErasing(p=0.3, scale=(0.02, 0.25), ratio=(0.5, 2.0), value=0),
-
-        # --- 5. NORMALIZE ---
-        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)])
+        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+    ])
 
     return train_transform, val_transform
 
