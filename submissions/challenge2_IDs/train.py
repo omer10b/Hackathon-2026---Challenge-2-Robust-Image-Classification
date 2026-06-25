@@ -96,6 +96,10 @@ def rand_bbox(size, lam):
 # Transforms
 # ---------------------------------------------------
 
+# ---------------------------------------------------
+# Transforms
+# ---------------------------------------------------
+
 def create_transforms():
     """
     Create the training and validation image transforms.
@@ -130,11 +134,33 @@ def create_transforms():
         # --- 5. NORMALIZE ---
         transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)])
 
-    val_transform = transforms.Compose([ transforms.Resize(256),transforms.CenterCrop(IMAGE_SIZE),
-        transforms.ToTensor(),transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)])
+    val_transform = transforms.Compose([
+        # --- 1. SPATIAL & GEOMETRIC ---
+        transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomApply([transforms.RandomRotation(degrees=15)], p=0.3),
+
+        # --- 2. COLOR & LIGHTING ---
+        # Same color inversion as training
+        transforms.RandomInvert(p=0.2),
+
+        transforms.RandomApply([
+            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.6, hue=0.2)], p=0.4),
+
+        # --- 3. BLUR (Camera Focus Vulnerability) ---
+        transforms.RandomApply([
+            transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))], p=0.3),
+
+        # --- CONVERT TO MATH TENSOR ---
+        transforms.ToTensor(),
+
+        # --- 4. OCCLUSION (Random Erasing Vulnerability) ---
+        transforms.RandomErasing(p=0.3, scale=(0.02, 0.25), ratio=(0.5, 2.0), value=0),
+
+        # --- 5. NORMALIZE ---
+        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)])
 
     return train_transform, val_transform
-
 
 # ---------------------------------------------------
 # Load datasets
