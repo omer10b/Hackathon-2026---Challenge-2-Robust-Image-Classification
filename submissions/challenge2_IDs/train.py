@@ -29,6 +29,25 @@ EPOCHS = 20
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
+def rand_bbox(size, lam):
+    """Generates random bounding box coordinates for CutMix."""
+    W = size[2]
+    H = size[3]
+    cut_rat = (1. - lam) ** 0.5
+    cut_w = int(W * cut_rat)
+    cut_h = int(H * cut_rat)
+
+    # Choose a random center pixel
+    cx = torch.randint(0, W, (1,)).item()
+    cy = torch.randint(0, H, (1,)).item()
+
+    # Calculate the box boundaries
+    bbx1 = max(cx - cut_w // 2, 0)
+    bby1 = max(cy - cut_h // 2, 0)
+    bbx2 = min(cx + cut_w // 2, W)
+    bby2 = min(cy + cut_h // 2, H)
+
+    return bbx1, bby1, bbx2, bby2
 
 def main():
     """
@@ -40,19 +59,31 @@ def main():
 
     # 1. Define Training and Validation transforms
     train_transform = transforms.Compose([
-        # 1. Randomly resize and crop (forces model to recognize parts of objects)
+        # --- 1. SPATIAL & GEOMETRIC ---
         transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)),
-
-        # 2. Randomly flip left/right (mirrors the image)
         transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomApply([transforms.RandomRotation(degrees=15)], p=0.3),
 
-        # 3. Slight rotations (fixes perfectly upright biases)
-        transforms.RandomRotation(degrees=15),
+        # --- 2. COLOR & LIGHTING ---
+        # NEW: 20% chance to completely invert all colors (forces shape recognition)
+        transforms.RandomInvert(p=0.2),
+        
+        transforms.RandomApply([
+            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.6, hue=0.2)
+        ], p=0.4),
 
-        # 4. Color Jitter (simulates different lighting/camera qualities)
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        # --- 3. BLUR (Camera Focus Vulnerability) ---
+        transforms.RandomApply([
+            transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))
+        ], p=0.3),
 
+        # --- CONVERT TO MATH TENSOR ---
         transforms.ToTensor(),
+
+        # --- 4. OCCLUSION (Random Erasing Vulnerability) ---
+        transforms.RandomErasing(p=0.3, scale=(0.02, 0.25), ratio=(0.5, 2.0), value=0),
+
+        # --- 5. NORMALIZE ---
         transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
     ])
 
@@ -122,15 +153,50 @@ def main():
             inputs, labels = inputs.to(device), labels.to(device)
 
             optimizer.zero_grad()
-            logits = model(inputs)
-            loss = criterion(logits, labels)
+
+            # --- CUTMIX LOGIC (50% Activation Probability) ---
+            r = torch.rand(1).item()
+            if r < 0.5:
+                # 1. Generate a random mix ratio (lambda)
+                lam = torch.rand(1).item()
+                
+                # 2. Shuffle the batch to get partner images
+                rand_index = torch.randperm(inputs.size(0)).to(device)
+                target_a = labels # Original labels
+                target_b = labels[rand_index] # Partner labels
+                
+                # 3. Get the bounding box and physically cut-and-paste the pixels
+                bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+                inputs[:, :, bby1:bby2, bbx1:bbx2] = inputs[rand_index, :, bby1:bby2, bbx1:bbx2]
+                
+                # 4. Adjust lambda based on the exact pixel area that was replaced
+                lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+                
+                # 5. Forward pass and Mixed Loss calculation
+                logits = model(inputs)
+                loss = criterion(logits, target_a) * lam + criterion(logits, target_b) * (1. - lam)
+            else:
+                # --- STANDARD LOGIC (For the other 50% of batches) ---
+                logits = model(inputs)
+                loss = criterion(logits, labels)
+            # -------------------------------------------------
+
             loss.backward()
             optimizer.step()
 
+            # --- RESTORED METRICS TRACKING ---
             train_loss += loss.item()
-            preds = logits.argmax(dim=1)
-            train_correct += (preds == labels).sum().item()
             train_total += labels.size(0)
+            
+            preds = logits.argmax(dim=1)
+            if r < 0.5:
+                # For CutMix, we grade the prediction against whichever image took up the majority of the space
+                dominant_label = target_a if lam > 0.5 else target_b
+                train_correct += (preds == dominant_label).sum().item()
+            else:
+                # Standard grading
+                train_correct += (preds == labels).sum().item()
+            # --------------------------------- 
 
         avg_train_loss = train_loss / len(train_loader)
         train_acc = train_correct / train_total
