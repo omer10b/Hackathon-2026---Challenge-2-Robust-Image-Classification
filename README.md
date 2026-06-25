@@ -1,7 +1,7 @@
 # Robust Image Classification - Baseline Model
 
 ## Overview
-This project implements a custom Convolutional Neural Network (CNN) for the "Hackathon 2026 – Challenge 2: Robust Image Classification".
+This project implements a custom Convolutional Neural Network (CNN) for the "Hackathon 2026 - Challenge 2: Robust Image Classification".
 The objective is to classify images into 20 classes while improving robustness against common visual variations such as changes in object position, orientation, lighting conditions, and color distribution.
 ---
 
