@@ -24,14 +24,10 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
-from labels import (
-    HF_INDEX_TO_NAME,
-    HF_INDEX_TO_IDX,
-    TARGET_HF_INDICES,
-)
+from labels import (HF_INDEX_TO_NAME,HF_INDEX_TO_IDX,TARGET_HF_INDICES,)
 
 # ── editable ──────────────────────────────────────────────────────────────────
-DATA_ROOT = Path("dataset")   # contains train/ and validation/
+DATA_ROOT = Path("dataset_split")   # contains train/ and validation/
 SUBMISSIONS_DIR = Path("submissions")
 BATCH_SIZE = 64
 WEIGHTS_FILENAME = "weights.joblib"

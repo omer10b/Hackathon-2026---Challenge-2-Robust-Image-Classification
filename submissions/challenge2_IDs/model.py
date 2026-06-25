@@ -1,6 +1,14 @@
+# ---------------------------------------------------
+# Imports
+# ---------------------------------------------------
+
 import torch
 import torch.nn as nn
 
+
+# ---------------------------------------------------
+# Model Architecture
+# ---------------------------------------------------
 
 class ModelArchitecture(nn.Module):
     """
@@ -44,8 +52,8 @@ class ModelArchitecture(nn.Module):
 
             # Global Average Pool: Forces any remaining spatial size to 1x1
             # Tensor shape becomes (batch_size, 512, 1, 1)
-            nn.AdaptiveAvgPool2d((1, 1))
-        )
+            nn.AdaptiveAvgPool2d((1, 1)))
+
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
@@ -58,8 +66,7 @@ class ModelArchitecture(nn.Module):
             nn.Dropout(p=0.2),
 
             # Final output layer
-            nn.Linear(256, num_classes)
-        )
+            nn.Linear(256, num_classes))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)

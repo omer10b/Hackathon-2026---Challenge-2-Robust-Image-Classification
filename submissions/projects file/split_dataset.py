@@ -1,6 +1,3 @@
-from pathlib import Path
-import random
-import shutil
 
 """
 Split the original dataset into train, validation and test sets.
@@ -14,6 +11,15 @@ Split ratios:
 
 The random seed is fixed to ensure reproducibility.
 """
+
+# ---------------------------------------------------
+# Imports
+# ---------------------------------------------------
+
+from pathlib import Path
+import random
+import shutil
+
 
 # ---------------------------------------------------
 # Paths
@@ -51,9 +57,7 @@ if not SOURCE_DIR.exists():
 
 # Prevent accidentally overwriting an existing split
 if OUTPUT_DIR.exists():
-    raise RuntimeError(
-        f"{OUTPUT_DIR} already exists. Delete it first if you want to recreate the split."
-    )
+    raise RuntimeError(f"{OUTPUT_DIR} already exists. Delete it first if you want to recreate the split.")
 
 # ---------------------------------------------------
 # Iterate over every class folder
@@ -63,10 +67,7 @@ for class_dir in sorted(SOURCE_DIR.iterdir()):
         continue
 
     # Collect all images from the current class
-    images = [
-        p for p in class_dir.iterdir()
-        if p.is_file() and p.suffix in IMAGE_EXTENSIONS
-    ]
+    images = [p for p in class_dir.iterdir()if p.is_file() and p.suffix in IMAGE_EXTENSIONS]
 
     # Sort for consistency and then shuffle randomly
     images = sorted(images)
@@ -84,22 +85,14 @@ for class_dir in sorted(SOURCE_DIR.iterdir()):
 # ---------------------------------------------------
 # Copy images into their corresponding folders
 # ---------------------------------------------------
-    for split_name, split_images in [
-        ("train", train_images),
-        ("validation", val_images),
-        ("test", test_images),
-    ]:
+    for split_name, split_images in [("train", train_images),("validation", val_images),("test", test_images),]:
         out_class_dir = OUTPUT_DIR / split_name / class_dir.name
         out_class_dir.mkdir(parents=True, exist_ok=True)
 
         for img_path in split_images:
             shutil.copy2(img_path, out_class_dir / img_path.name)
 
-    print(
-        f"{class_dir.name}: "
-        f"train={len(train_images)}, "
-        f"validation={len(val_images)}, "
-        f"test={len(test_images)}"
+    print(f"{class_dir.name}: "f"train={len(train_images)}, "f"validation={len(val_images)}, "f"test={len(test_images)}"
     )
 
 # ---------------------------------------------------
