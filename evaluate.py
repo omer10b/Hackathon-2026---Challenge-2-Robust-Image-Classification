@@ -79,19 +79,81 @@ class ImageNetSubset(Dataset):
         return image, label
 
 
-def load_test_set():
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+def load_test_sets():
+    # 1. Clean Baseline
+    clean_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
     ])
 
-    dataset = ImageNetSubset(DATA_ROOT, split="validation", transform=transform)
-    print(f"Loaded {len(dataset)} validation images across {len(TARGET_HF_INDICES)} classes.\n")
+    # 2. Trained (Seen Manipulations - Light flip & jitter)
+    seen_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.RandomHorizontalFlip(p=1.0), 
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
+    ])
 
-    return DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+    # 3. Trained (Blur - Now part of the training curriculum)
+    blur_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),
+        transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5)),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
+    ])
 
+    # 4. Trained (Erasing - Now part of the training curriculum)
+    erase_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),
+        transforms.RandomErasing(p=1.0, scale=(0.1, 0.3), ratio=(0.5, 2.0), value=0),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
+    ])
+
+    # 5. Trained (Extreme Color - Now part of the training curriculum)
+    color_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.ColorJitter(brightness=0.8, contrast=0.8, saturation=0.8, hue=0.3),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
+    ])
+
+    # --- NEW UNSEEN STRESS TESTS ---
+
+    # 6. Untrained (Perspective - Geometric warping)
+    perspective_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.RandomPerspective(distortion_scale=0.4, p=1.0),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
+    ])
+
+    # 7. Untrained (Grayscale - Edge/Shape reliance)
+    grayscale_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.RandomGrayscale(p=1.0),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
+    ])
+
+    # 8. Untrained (Solarize - Highlight inversion)
+    solarize_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.RandomSolarize(threshold=192.0, p=1.0),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
+    ])
+
+    # Package them all up into a dictionary of DataLoaders
+    return {
+        "Clean Baseline": DataLoader(ImageNetSubset(DATA_ROOT, "validation", clean_transform), batch_size=BATCH_SIZE),
+        "Trained (Seen)": DataLoader(ImageNetSubset(DATA_ROOT, "validation", seen_transform), batch_size=BATCH_SIZE),
+        "Trained (Blur)": DataLoader(ImageNetSubset(DATA_ROOT, "validation", blur_transform), batch_size=BATCH_SIZE),
+        "Trained (Erasing)": DataLoader(ImageNetSubset(DATA_ROOT, "validation", erase_transform), batch_size=BATCH_SIZE),
+        "Trained (Extreme Color)": DataLoader(ImageNetSubset(DATA_ROOT, "validation", color_transform), batch_size=BATCH_SIZE),
+        "Untrained (Perspective)": DataLoader(ImageNetSubset(DATA_ROOT, "validation", perspective_transform), batch_size=BATCH_SIZE),
+        "Untrained (Grayscale)": DataLoader(ImageNetSubset(DATA_ROOT, "validation", grayscale_transform), batch_size=BATCH_SIZE),
+        "Untrained (Solarize)": DataLoader(ImageNetSubset(DATA_ROOT, "validation", solarize_transform), batch_size=BATCH_SIZE)
+    }
 
 # ── submission loading ────────────────────────────────────────────────────────
 
