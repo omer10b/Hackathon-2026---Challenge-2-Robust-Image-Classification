@@ -63,5 +63,8 @@ To improve generalization and robustness, the following augmentations are applie
     - Brightness
     - Contrast
     - Saturation
-
+- Random Erasing
+  - Randomly hides parts of the image, forcing the model to rely on more global object features.
+- Gaussian Blur
+  - Simulates blurry or low-quality images and improves robustness to focus and camera noise.
 ---
