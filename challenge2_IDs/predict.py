@@ -46,32 +46,15 @@ class Model(BaseModel):
     """
 
     def __init__(self):
-        ModelArchitecture = load_model_architecture()
-        self.net = ModelArchitecture()
+        self.net = ModelArchitecture(num_classes=20)
 
     def load(self, weights_path: str) -> None:
-        """
-        Load trained model weights from weights.joblib.
-        """
         state_dict = joblib.load(weights_path)
         self.net.load_state_dict(state_dict)
         self.net.eval()
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Predict class labels for a batch of images.
-
-        Parameters
-        ----------
-        x:
-            Tensor of shape [batch_size, 3, height, width]
-
-        Returns
-        -------
-        preds:
-            Tensor of shape [batch_size]
-            Each value must be an integer class index from 0 to 19.
-        """
         with torch.no_grad():
             logits = self.net(x)
-        return logits.argmax(dim=1)
+            preds = logits.argmax(dim=1)
+        return preds
